@@ -28,7 +28,7 @@ TPDU_DATA_ACK            = 0x60
 TYPE_RDP_NEG_REQ = 1
 PROTOCOL_RDP     = 0
 PROTOCOL_SSL     = 1
-PROTOCOL_HYBRID  = 2
+PROTOCOL_HYBRID  = 8 #Change to 8 instead of 2 because Microsoft seems to prefer this...
 
 # RDP_NEG_RSP constants
 TYPE_RDP_NEG_RSP = 2
