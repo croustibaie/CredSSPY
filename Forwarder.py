@@ -44,12 +44,10 @@ class receiver(asyncore.dispatcher):
             self.sender.close()
 
 class sender(asyncore.dispatcher):
-    def __init__(self, receiver, remoteaddr,remoteport):
-        asyncore.dispatcher.__init__(self)
+    def __init__(self, receiver, conn):
+        asyncore.dispatcher.__init__(self,conn)
         self.receiver=receiver
         receiver.sender=self
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect((remoteaddr, remoteport))
 
     def handle_connect(self):
         pass
