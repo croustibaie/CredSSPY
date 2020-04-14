@@ -15,7 +15,7 @@ def clientConnect(host, username, password, domain):
     tpdu = TPDU()
     rdp_neg = RDP_NEG_REQ()
     rdp_neg['Type'] = TYPE_RDP_NEG_REQ
-    rdp_neg['requestedProtocols'] = PROTOCOL_HYBRID | PROTOCOL_SSL
+    rdp_neg['requestedProtocols'] = PROTOCOL_HYBRID_EX | PROTOCOL_HYBRID | PROTOCOL_SSL
     tpdu['VariablePart'] = rdp_neg.getData()
     tpdu['Code'] = TDPU_CONNECTION_REQUEST
     tpkt['TPDU'] = tpdu.getData()
