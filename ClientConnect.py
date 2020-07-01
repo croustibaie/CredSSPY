@@ -10,7 +10,7 @@ from OpenSSL import SSL, crypto
 
 
 #Function connecting to a legitimate RDP server. Returns the ssl socket of the connection
-def clientConnect(host, username, password, domain):
+def clientConnect(host, username, password, domain, connect = True):
     tpkt = TPKT()
     tpdu = TPDU()
     rdp_neg = RDP_NEG_REQ()
@@ -84,12 +84,6 @@ def clientConnect(host, username, password, domain):
     try:
         # Sending the Type 3 NTLM blob
         tls.send(ts_request.getData())
-        # The other end is waiting for the pubKeyAuth field, but looks like it's
-        # not needed to check whether authentication worked.
-        # If auth is unsuccessful, it throws an exception with the previous send().
-        # If auth is successful, the server waits for the pubKeyAuth and doesn't answer
-        # anything. So, I'm sending garbage so the server returns an error.
-        # Luckily, it's a different error so we can determine whether or not auth worked ;)
         buff = tls.recv(1024)
     except Exception as err:
         if str(err).find("denied") > 0:
@@ -100,23 +94,31 @@ def clientConnect(host, username, password, domain):
 
 #Step4: Server should send its pubkey signature.
 
-    ts_request = TSRequest(buff)
-    # Now we're decrypting the certificate + 1 sent by the server. Not worth checking ;)
-    signature, plain_text = cipher.decrypt(ts_request['pubKeyAuth'])
+    try :
+        ts_request = TSRequest(buff)
+        #if password is invalid buff can't be decode
+        # Now we're decrypting the certificate + 1 sent by the server. Not worth checking ;)
+        signature, plain_text = cipher.decrypt(ts_request['pubKeyAuth'])
+        if username != ""  and password != "":
+           print "Found valid credentials: " +username+":"+password 
+    except Exception as err:
+        return 0
 
 #Step5: Send the encrypted credentials to the server
-    tsp = TSPasswordCreds()
-    tsp['domainName'] = domain
-    tsp['userName']   = username
-    tsp['password']   = password
-    tsc = TSCredentials()
-    tsc['credType'] = 1 # TSPasswordCreds
-    tsc['credentials'] = tsp.getData()
-    signature, cripted_creds = cipher.clientEncrypt(tsc.getData())
-    ts_request = TSRequest()
-    ts_request['authInfo'] = signature.getData() + cripted_creds
-    tls.send(ts_request.getData())
-    print "Credentials sent"
-
-    return tls
+    if connect == True :
+        tsp = TSPasswordCreds()
+        tsp['domainName'] = domain
+        tsp['userName']   = username
+        tsp['password']   = password
+        tsc = TSCredentials()
+        tsc['credType'] = 1 # TSPasswordCreds
+        tsc['credentials'] = tsp.getData()
+        signature, cripted_creds = cipher.clientEncrypt(tsc.getData())
+        ts_request = TSRequest()
+        ts_request['authInfo'] = signature.getData() + cripted_creds
+        tls.send(ts_request.getData())
+        print "Credentials sent"
+        return tls
+    else :
+        return 1
 
